@@ -51,10 +51,11 @@ function game(){
         snark:'',
         db:null,
         bestLevel:0,
-        roadWidth:80,
-        progress:0,
-        truck:{x:400,y:0},
-        trailer:{x:400,y:-40},
+    roadWidth:80,
+    progress:0,
+    truck:{x:400,y:0}, // y=0 is bottom (home), y=roadLength is top (campsite)
+    trailer:{x:400,y:40},
+    roadLength:2400, // Increased road length
         init(){
             const config = { locateFile: filename => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/${filename}`};
             initSqlJs(config).then(SQL=>{
@@ -72,7 +73,7 @@ function game(){
             this.message='';
             this.progress=0;
             this.truck={x:400,y:0};
-            this.trailer={x:400,y:-40};
+            this.trailer={x:400,y:40};
             this.speed=this.baseSpeed*Math.pow(1.1,this.level-1);
         },
         wheelStart(e){ this.wheelTracking=true; this.prevAngle=this.pointerAngle(e); },
@@ -92,21 +93,27 @@ function game(){
             const y = (rect.top + rect.height/2) - e.clientY;
             return Math.atan2(y,x)*180/Math.PI;
         },
+        // More complex and longer road
         roadCenter(y){
-            const t = y/600;
-            return 400 + 100*Math.sin(t*2*Math.PI);
+            const t = y/this.roadLength;
+            // Multiple sine/cosine waves for more turns
+            return 400
+                + 120*Math.sin(t*2*Math.PI)
+                + 60*Math.sin(t*6*Math.PI)
+                + 40*Math.cos(t*4*Math.PI + Math.PI/3)
+                + 30*Math.sin(t*12*Math.PI + Math.PI/5);
         },
         update(){
             this.truck.y += this.speed;
             this.truck.x += this.wheelAngle*0.05;
-            this.trailer.y = this.truck.y - 40;
+            this.trailer.y = this.truck.y + 40;
             this.trailer.x += (this.truck.x - this.trailer.x)*0.1;
-            this.progress = this.truck.y/600;
+            this.progress = this.truck.y/this.roadLength;
             const center = this.roadCenter(this.truck.y);
             if(Math.abs(this.truck.x - center) > this.roadWidth/2){
                 this.gameOver();
             }
-            if(this.truck.y > 600){
+            if(this.truck.y > this.roadLength){
                 this.levelComplete();
             }
             this.wheelAngle *= 0.9;
@@ -135,19 +142,27 @@ function game(){
             ctx.lineWidth=this.roadWidth;
             ctx.lineCap='round';
             ctx.beginPath();
+            // Flip the road: y=0 is bottom, y=roadLength is top
+            const yOffset = Math.max(0, this.truck.y - 300);
             for(let y=0;y<=600;y+=10){
-                const x = this.roadCenter(y);
-                if(y===0) ctx.moveTo(x,y);
-                else ctx.lineTo(x,y);
+                // screenY=600-y to flip vertically
+                const worldY = yOffset + (600-y);
+                const x = this.roadCenter(worldY);
+                if(y===0) ctx.moveTo(x,600-y);
+                else ctx.lineTo(x,600-y);
             }
             ctx.stroke();
             ctx.font='24px sans-serif';
-            ctx.fillText('🏠', this.roadCenter(0)-12, 24);
-            ctx.fillText('🏕️', this.roadCenter(600)-12, 590);
+            // Home at bottom, campsite at top
+            ctx.fillText('🏠', this.roadCenter(0)-12, 590);
+            ctx.fillText('🏕️', this.roadCenter(this.roadLength)-12, 24);
+            // Draw truck and trailer relative to viewport, flipped
+            const truckScreenY = 600 - (this.truck.y - yOffset);
+            const trailerScreenY = 600 - (this.trailer.y - yOffset);
             ctx.fillStyle='blue';
-            ctx.fillRect(this.truck.x-10,this.truck.y-20,20,40);
+            ctx.fillRect(this.truck.x-10,truckScreenY-20,20,40);
             ctx.fillStyle='green';
-            ctx.fillRect(this.trailer.x-15,this.trailer.y-30,30,60);
+            ctx.fillRect(this.trailer.x-15,trailerScreenY-30,30,60);
             if(!this.message) this.update();
             requestAnimationFrame(()=>this.draw());
         }
