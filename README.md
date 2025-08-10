@@ -1,19 +1,15 @@
 # UncleDavidDriver
+
 Mini game driving truck/fifth wheel through a winding road.
 
-Platform: Single-file web apps: HTML + HTMX + Alpine + sql.js; host on GitHub Pages/Netlify.
+This project is a single-file web app built with **HTML**, **HTMX**, **Alpine.js**, and **sql.js**.  To play, open `index.html` in a modern browser. The page can be hosted on GitHub Pages or Netlify.
 
-Game screen appears in black with an orange frame.
-Game generates a winding road with smooth turns to the left and right beginning at a Home icon and ending at a campesite icon.
+## Gameplay
 
-At the beginning of the path, a simple icon from above appers to be truck pulling a fifthwheel with the trailer following the truck at the toe location.
+* The game screen is black with an orange frame.
+* A winding road with smooth turns stretches from a home icon to a campsite icon.
+* A top-down icon of a truck towing a fifth wheel follows the road. The trailer tracks behind the truck.
+* A textured half steering wheel appears at the bottom center. Rotate it clockwise or counter-clockwise with touch or mouse gestures to steer.
+* Each completed level increases speed by 10%. Leave the road and it's game over with a snarky comment; reach the campsite to advance to the next level.
 
-Along the bottom middle of the screen is the top 1/2 of a steering wheel with texture such that is is evident when the wheel is turned to the left or the right.
-
-The controls are a simple touch-screen (on mobile) or touchpad (on laptop) where the user makes circle motions to turn the steering wheel. Make a circle clockwise, the steering wheel and the truck turns to the right along the road. Make a cicle counter-clockwise, the steering goes to the left.
-
-The icon of the truck and its trailer advances along the road slowly at first. Each completed level, advancing the speed by 10%, making the task more difficult.
-
-As long as the truck stays on the road, it continues to the campsite (finish). If the truck veers from the road, then the game is over and the final level and score are displayed. Also make a snarky comment about the players bad driving.
-
-If the truck advances to the finish, then a congratulatory meessage is displayed and a new level is drawn and started.
+Have fun!
