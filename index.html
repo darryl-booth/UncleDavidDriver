@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Uncle David Driver</title>
+<script src="https://unpkg.com/htmx.org@1.9.10"></script>
+<script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/sql-wasm.js"></script>
+<style>
+    body,html { margin:0; padding:0; background:black; color:white; overflow:hidden; }
+    #gameCanvas { border:5px solid orange; display:block; margin:auto; background:#000; }
+    #wheel {
+        position:absolute; bottom:0; left:50%; transform:translateX(-50%);
+        width:200px; height:100px;
+        border:10px solid #555;
+        border-top-left-radius:100px 100px;
+        border-top-right-radius:100px 100px;
+        border-bottom:none;
+        background:#333;
+    }
+    #wheel:after {
+        content:''; position:absolute; left:50%; top:50%;
+        width:20px;height:20px;background:#777;border-radius:50%;transform:translate(-50%,-50%);
+    }
+    #message {
+       position:absolute; top:10px; left:50%; transform:translateX(-50%);
+       background:rgba(0,0,0,0.8); padding:10px; border:2px solid orange;
+    }
+</style>
+</head>
+<body x-data="game()" x-init="init()">
+<canvas id="gameCanvas" x-ref="canvas" width="800" height="600"></canvas>
+<div id="wheel" @pointerdown="wheelStart($event)" @pointermove="wheelMove($event)" @pointerup="wheelEnd()" @pointerleave="wheelEnd()" :style="{transform:'translateX(-50%) rotate(' + wheelAngle + 'deg)'}"></div>
+
+<div id="message" x-show="message" hx-on:click="startLevel()">
+    <div x-text="message"></div>
+    <div x-show="snark" x-text="snark" style="margin-top:5px;"></div>
+    <template x-if="bestLevel"><div style="margin-top:5px;">Best Level: <span x-text="bestLevel"></span></div></template>
+    <div style="margin-top:5px;">Click to continue</div>
+</div>
+
+<script>
+function game(){
+    return {
+        level:1,
+        speed:2,
+        baseSpeed:2,
+        wheelAngle:0,
+        wheelTracking:false,
+        message:'Click to start',
+        snark:'',
+        db:null,
+        bestLevel:0,
+        roadWidth:80,
+        progress:0,
+        truck:{x:400,y:0},
+        trailer:{x:400,y:-40},
+        init(){
+            const config = { locateFile: filename => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/${filename}`};
+            initSqlJs(config).then(SQL=>{
+                const db = new SQL.Database();
+                db.run('CREATE TABLE IF NOT EXISTS scores(level INTEGER);');
+                const res = db.exec('SELECT max(level) as m FROM scores');
+                this.bestLevel = res[0]?.values[0][0] || 0;
+                this.db = db;
+            });
+            this.ctx = this.$refs.canvas.getContext('2d');
+            requestAnimationFrame(()=>this.draw());
+        },
+        startLevel(){
+            this.snark='';
+            this.message='';
+            this.progress=0;
+            this.truck={x:400,y:0};
+            this.trailer={x:400,y:-40};
+            this.speed=this.baseSpeed*Math.pow(1.1,this.level-1);
+        },
+        wheelStart(e){ this.wheelTracking=true; this.prevAngle=this.pointerAngle(e); },
+        wheelMove(e){
+            if(!this.wheelTracking) return;
+            const angle = this.pointerAngle(e);
+            let delta = angle - this.prevAngle;
+            if (delta > 180) delta -= 360;
+            if (delta < -180) delta += 360;
+            this.wheelAngle += delta;
+            this.prevAngle = angle;
+        },
+        wheelEnd(){ this.wheelTracking=false; },
+        pointerAngle(e){
+            const rect = e.target.getBoundingClientRect();
+            const x = e.clientX - (rect.left + rect.width/2);
+            const y = (rect.top + rect.height/2) - e.clientY;
+            return Math.atan2(y,x)*180/Math.PI;
+        },
+        roadCenter(y){
+            const t = y/600;
+            return 400 + 100*Math.sin(t*2*Math.PI);
+        },
+        update(){
+            this.truck.y += this.speed;
+            this.truck.x += this.wheelAngle*0.05;
+            this.trailer.y = this.truck.y - 40;
+            this.trailer.x += (this.truck.x - this.trailer.x)*0.1;
+            this.progress = this.truck.y/600;
+            const center = this.roadCenter(this.truck.y);
+            if(Math.abs(this.truck.x - center) > this.roadWidth/2){
+                this.gameOver();
+            }
+            if(this.truck.y > 600){
+                this.levelComplete();
+            }
+            this.wheelAngle *= 0.9;
+        },
+        gameOver(){
+            const levels = this.level;
+            this.snark = ['Maybe stick to the golf cart?','Hope that trailer has insurance!','GPS recalculating...'][Math.floor(Math.random()*3)];
+            this.message = `Game Over – reached level ${levels}`;
+            if(this.db){
+                this.db.run('INSERT INTO scores VALUES (?)',[levels]);
+                const res = this.db.exec('SELECT max(level) as m FROM scores');
+                this.bestLevel = res[0]?.values[0][0] || levels;
+            }
+            this.level=1;
+        },
+        levelComplete(){
+            this.message = `Level ${this.level} complete!`;
+            this.level++;
+        },
+        draw(){
+            const ctx = this.ctx;
+            ctx.clearRect(0,0,800,600);
+            ctx.fillStyle='black';
+            ctx.fillRect(0,0,800,600);
+            ctx.strokeStyle='gray';
+            ctx.lineWidth=this.roadWidth;
+            ctx.lineCap='round';
+            ctx.beginPath();
+            for(let y=0;y<=600;y+=10){
+                const x = this.roadCenter(y);
+                if(y===0) ctx.moveTo(x,y);
+                else ctx.lineTo(x,y);
+            }
+            ctx.stroke();
+            ctx.font='24px sans-serif';
+            ctx.fillText('🏠', this.roadCenter(0)-12, 24);
+            ctx.fillText('🏕️', this.roadCenter(600)-12, 590);
+            ctx.fillStyle='blue';
+            ctx.fillRect(this.truck.x-10,this.truck.y-20,20,40);
+            ctx.fillStyle='green';
+            ctx.fillRect(this.trailer.x-15,this.trailer.y-30,30,60);
+            if(!this.message) this.update();
+            requestAnimationFrame(()=>this.draw());
+        }
+    }
+}
+document.addEventListener('alpine:init', () => {
+    Alpine.data('game', game);
+});
+</script>
+</body>
+</html>
